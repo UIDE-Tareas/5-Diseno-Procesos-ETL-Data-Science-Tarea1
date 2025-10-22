@@ -10,6 +10,8 @@ from typing import cast
 from typing import Tuple
 from types import SimpleNamespace
 
+# ████████████████████████████████████████████████████████████ Funciones base ████████████████████████████████████████████████████████████
+
 # Libs a instalar
 LIBS = [
     "plotly",
@@ -26,7 +28,10 @@ LIBS = [
     "scikit-learn",
     "requests",
     "wcwidth",
+    "tabulate",
+    "tabulate",
 ]
+
 
 class ConsoleColor(Enum):
     RED = "\033[91m"
@@ -173,6 +178,7 @@ class BoxStyle:
     H: str
     V: str
 
+
 class TitleBoxLineStyle(Enum):
     SIMPLE = BoxStyle("┌", "┐", "└", "┘", "─", "│")
     DOUBLE = BoxStyle("╔", "╗", "╚", "╝", "═", "║")
@@ -253,13 +259,306 @@ def UnzipFile(filename: str, outputDir: str):
         print(f"Error: {e}")
 
 
-# █ Inicio del script █
+import pandas as pd
+import pandas
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings
+from matplotlib.figure import Figure
+from matplotlib.axes import Axes
+from IPython.display import display
+from tabulate import tabulate
+
+warnings.filterwarnings("ignore")
+
+# Configurar opciones de Pandas
+pd.set_option("display.float_format", "{:.2f}".format)
+pandas.set_option("display.max_rows", None)
+pandas.set_option("display.max_columns", None)
+
+
+# Función para mostrar la información del DataFrame.
+def ShowDfInfo(df: pandas.DataFrame, title):
+    display(f"ℹ️ INFO {title} ℹ️")
+    df.info()
+    display()
+
+
+# Función para mostrar las n primeras filas del DataFrame.
+def ShowDfHead(df: pandas.DataFrame, title: str, headQty=10):
+    display(f"ℹ️ {title}: Primeros {headQty} elementos.")
+    print(
+        tabulate(
+            df.head(headQty).to_dict(orient="records"), headers="keys", tablefmt="psql"
+        )
+    )
+    display()
+
+
+# Función para mostrar las n últimas filas del DataFrame.
+def ShowDfTail(df: pandas.DataFrame, title: str, tailQty=10):
+    display(f"ℹ️ {title}: Últimos {tailQty} elementos.")
+    print(
+        tabulate(
+            df.head(tailQty).to_dict(orient="records"), headers="keys", tablefmt="psql"
+        )
+    )
+    display()
+
+
+# Mostrar el tamaño del DataFrame
+def ShowDfShape(df: pandas.DataFrame, title: str):
+    display(f"ℹ️ {title} - Tamaño de los datos")
+    display(f"{df.shape[0]} filas x {df.shape[1]} columnas")
+    display()
+
+
+# Función para mostrar la estadística descriptiva de todas las columnas del DataFrame, por tipo de dato.
+def ShowDfStats(df: pandas.DataFrame, title: str = ""):
+    display(f"ℹ️ Estadística descriptiva - {title}")
+    numeric_cols = df.select_dtypes(include="number")
+    if not numeric_cols.empty:
+        display("    🔢 Columnas numéricas".upper())
+        numeric_desc = (
+            numeric_cols.describe().round(2).T
+        )  # Transpuesta para añadir columna
+        numeric_desc["var"] = numeric_cols.var(numeric_only=True).round(2)
+        display(numeric_desc.T)
+    non_numeric_cols = df.select_dtypes(
+        include=["boolean", "string", "category", "object"]
+    )
+    if not non_numeric_cols.empty:
+        display("    🔡 Columnas no numéricas".upper())
+        non_numeric_desc = non_numeric_cols.describe()
+        display(non_numeric_desc)
+    datetime_cols = df.select_dtypes(include=["datetime", "datetimetz"])
+    if not datetime_cols.empty:
+        display("    📅 Columnas fechas".upper())
+        datetime_desc = datetime_cols.describe()
+        display(datetime_desc)
+
+
+# Función para mostrar los valores nulos o NaN de cada columna en un DataFrame
+def ShowDfNanValues(df: pandas.DataFrame, title: str):
+    display(f"ℹ️ Contador de valores Nulos - {title}")
+    nulls_count = df.isnull().sum()
+    nulls_df = nulls_count.reset_index()
+    nulls_df.columns = ["Columna", "Cantidad_Nulos"]
+    display(nulls_df)
+    display()
+
+
+# Tipos de correlación
+class CorrelationType(Enum):
+    ALL = "all"
+    STRONG = "strong"
+    WEAK = "weak"
+
+
+# Muestra las correlaciones completas, débiles y fuertes.
+def ShowDfCorrelation(
+    df: pandas.DataFrame,
+    title: str,
+    fig: Figure,
+    ax: Axes,
+    level: CorrelationType = CorrelationType.ALL,
+    umbral: float = 0.6,  # |r| >= umbral => fuerte; |r| <= umbral => débil
+    showTable: bool = False,
+    annotate: bool = True,
+):
+    display(f"ℹ️ {(title).upper()} - Matriz de Correlación, Type: {level.name}")
+    corr = df.select_dtypes(include=["number"]).corr().copy()
+    if level == CorrelationType.STRONG:
+        corr = corr.where(np.abs(corr) >= umbral)
+    elif level == CorrelationType.WEAK:
+        corr = corr.where(np.abs(corr) <= umbral)
+        np.fill_diagonal(corr.values, 1)
+    elif level != CorrelationType.ALL:
+        raise ValueError(f"Invalid level: {level}")
+    cax = ax.matshow(corr, vmin=-1, vmax=1)
+
+    cols = corr.columns
+    ax.set_xticks(range(len(cols)))
+    ax.set_yticks(range(len(cols)))
+    ax.set_xticklabels(cols, rotation=90, ha="left")
+    ax.set_yticklabels(cols)
+
+    fig.colorbar(cax)
+
+    if annotate:
+        for (i, j), value in np.ndenumerate(corr.values):
+            if not np.isnan(value):
+                ax.text(j, i, f"{value:+.2f}", ha="center", va="center")
+
+    if level == CorrelationType.ALL:
+        titulo = "Matriz de correlación completa"
+    else:
+        titulo = f"Matriz de correlación ({level.name}, umbral={umbral})"
+
+    total_elementos = corr.size
+    total_nodiagonal = corr.size - corr.shape[0]
+    total_nan = corr.isna().sum().sum()
+    total_validos = total_elementos - total_nan - corr.shape[0]
+    titulo = f"{titulo}, Total Matriz: {total_nodiagonal}, Total válidos: {total_validos}({((total_validos*100)/total_nodiagonal):.2f}%)"
+
+    ax.set_title(titulo, pad=20)
+    ax.grid(False)
+    plt.tight_layout()
+    plt.show()
+    if showTable:
+        display(corr)
+    return corr
+
+
+# ████████████████████████████████████████████████████████████ Inicio del script ████████████████████████████████████████████████████████████
 
 DOWNLOAD_DIR = "Temp"
 
-DATA_FILE_URI = "https://github.com/UIDE-Tareas/3-Visualizacion-Avanzada-Datos-Data-Science-Tarea3/raw/refs/heads/main/Data/notas_master_data_science.csv"
+DATA_FILE_URI = "https://github.com/UIDE-Tareas/5-Diseno-Procesos-ETL-Data-Science-Tarea1/raw/refs/heads/main/Data/NotasMasterDataScience.csv"
 DATA_FILENAME = f"{DOWNLOAD_DIR}/NotasMasterNotasMasterDataScience.csv"
 
-ShowTitleBox("DESCARGANDO BASE DE DATOS", boxLineStyle=TitleBoxLineStyle.BLOCK, color=ConsoleColor.MAGENTA)
+ShowTitleBox(
+    "DESCARGANDO BASE DE DATOS",
+    boxLineStyle=TitleBoxLineStyle.BLOCK,
+    color=ConsoleColor.CYAN,
+)
 DownloadFile(DATA_FILE_URI, DATA_FILENAME, False)
 
+ShowTitleBox(
+    "ANÁLISIS INICIAL DE DATOS",
+    boxLineStyle=TitleBoxLineStyle.BLOCK,
+    color=ConsoleColor.CYAN,
+)
+
+data = pd.read_csv(DATA_FILENAME)
+ShowDfInfo(data, "Notas Master Data Science")
+ShowDfHead(data, "Notas Master Data Science", 10)
+ShowDfShape(data, "Notas Master Data Science")
+
+
+ShowTitleBox(
+    "CALCULO DE PROMEDIOS",
+    boxLineStyle=TitleBoxLineStyle.BLOCK,
+    color=ConsoleColor.CYAN,
+)
+data["Promedio"] = data.iloc[:, 1:].mean(axis=1).round(2)
+ShowDfHead(data, "Notas Master Data Science", 10)
+
+UMBRAL_APROBADO = 60.0
+data["Estado"] = data["Promedio"].apply(lambda x: "Aprobado" if x >= UMBRAL_APROBADO else "Reprobado")
+dataAprobados = data[data.Promedio >= UMBRAL_APROBADO]
+dataReprobados = data[data.Promedio < UMBRAL_APROBADO]
+ShowDfHead(dataAprobados, " Master Data Science - Estudiantes Aprobados ✅", 10)
+ShowDfHead(dataReprobados, " Master Data Science - Estudiantes Reprobados ❌", 10)
+
+
+promediosMateria = data.iloc[:, 1:-2].mean(axis=0).round(2)
+dataPromediosMateria = pandas.DataFrame({
+    "Materia": promediosMateria.index,
+    "Promedio": promediosMateria.values
+})
+ShowDfHead(dataPromediosMateria, " Master Data Science - Promedios por materia", 10)
+
+mejorEstudiante = data.loc[data["Promedio"].idxmax()]
+peorEstudiante = data.loc[data["Promedio"].idxmin()]
+
+# ████████████████████████████████████████████████████████████ Dashboard ████████████████████████████████████████████████████████████
+
+from dash import Dash, html
+from dash import Dash, dcc, html, Input, Output, dash_table
+import dash_bootstrap_components as dbc
+import plotly.express as px
+import webbrowser
+
+HOST = "localhost"
+PORT = 7374
+app = Dash(__name__, external_stylesheets=[dbc.themes.QUARTZ])
+print(f"Iniciando Dashboard Host:{HOST}, Port:{PORT}...")
+app.title = "Master Data Science - Análisis de Notas"
+
+figPastel = px.pie(
+    data,
+    names="Estado",
+    title="Distribución de Aprobados vs Reprobados",
+    color="Estado",
+    color_discrete_map={"Aprobado": "#00cc96", "Reprobado": "#ef553b"},
+    hole=0.3,
+)
+figPastel.update_layout(template="plotly_dark")
+
+
+figBarras = px.bar(
+    dataPromediosMateria,
+    x="Materia",
+    y="Promedio",
+    title="Promedio de Calificaciones por Materia",
+    text="Promedio",
+    color="Promedio",
+    color_continuous_scale="Blues",
+)
+figBarras.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+figBarras.update_layout(template="plotly_dark", xaxis_title="Materia", yaxis_title="Promedio")
+
+def KpiCard(title, value, subtitle):
+    return dbc.Card(
+        dbc.CardBody(
+            [
+                html.H6(title, className="text-muted"),
+                html.H2(value, className="mb-1"),
+                html.P(subtitle, className="text-muted mb-0"),
+            ]
+        ),
+        className="h-100 text-center",
+    )
+
+kpiMejorEstudiante = KpiCard("🏆 Mejor Estudiante", f"{mejorEstudiante['Promedio']:.2f}", mejorEstudiante["Nombre"])
+kpiPeorEstudiante = KpiCard("📉 Peor Estudiante", f"{peorEstudiante['Promedio']:.2f}", peorEstudiante["Nombre"])
+
+app.layout = dbc.Container(
+    [
+        dbc.NavbarSimple(
+            brand="Dashboard de Calificaciones — Análisis de Notas",
+            color="primary",
+            dark=True,
+            className="mb-4",
+        ),
+
+        dbc.Row(
+            [
+                dbc.Col(kpiMejorEstudiante, md=6),
+                dbc.Col(kpiPeorEstudiante, md=6),
+            ],
+            className="g-4",
+        ),
+
+        dbc.Row(
+            [
+                dbc.Col(
+                    dbc.Card(
+                        dbc.CardBody([
+                            html.H5("Distribución de Aprobados vs Reprobados"),
+                            dcc.Graph(figure=figPastel)
+                        ])
+                    ),
+                    md=6
+                ),
+                dbc.Col(
+                    dbc.Card(
+                        dbc.CardBody([
+                            html.H5("Promedio de Calificaciones por Materia"),
+                            dcc.Graph(figure=figBarras)
+                        ])
+                    ),
+                    md=6
+                ),
+            ],
+            className="g-4",
+        ),
+    ],
+    fluid=True,
+)
+
+if __name__ == "__main__":
+    webbrowser.open(f"http://{HOST}:{PORT}")
+    app.run(debug=True, port=PORT, host=HOST, use_reloader=False )
