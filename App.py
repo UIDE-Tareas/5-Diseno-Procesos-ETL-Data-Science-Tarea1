@@ -163,8 +163,8 @@ def ShowEnvironmentInfo():
     print()
 
 
-InstallDeps(LIBS)
-ShowEnvironmentInfo()
+# InstallDeps(LIBS)
+# ShowEnvironmentInfo()
 
 import requests
 
@@ -301,7 +301,7 @@ def ShowDfTail(df: pandas.DataFrame, title: str, tailQty=10):
     display(f"ℹ️ {title}: Últimos {tailQty} elementos.")
     print(
         tabulate(
-            df.head(tailQty).to_dict(orient="records"), headers="keys", tablefmt="psql"
+            df.tail(tailQty).to_dict(orient="records"), headers="keys", tablefmt="psql"
         )
     )
     display()
@@ -416,7 +416,7 @@ def ShowDfCorrelation(
 DOWNLOAD_DIR = "Temp"
 
 DATA_FILE_URI = "https://github.com/UIDE-Tareas/5-Diseno-Procesos-ETL-Data-Science-Tarea1/raw/refs/heads/main/Data/NotasMasterDataScience.csv"
-DATA_FILENAME = f"{DOWNLOAD_DIR}/NotasMasterNotasMasterDataScience.csv"
+DATA_FILENAME = f"{DOWNLOAD_DIR}/NotasMasterDataScience.csv"
 
 ShowTitleBox(
     "DESCARGANDO BASE DE DATOS",
@@ -433,9 +433,12 @@ ShowTitleBox(
 
 data = pd.read_csv(DATA_FILENAME)
 ShowDfInfo(data, "Notas Master Data Science")
+ShowDfStats(data, "Notas Master Data Science")
 ShowDfHead(data, "Notas Master Data Science", 10)
 ShowDfShape(data, "Notas Master Data Science")
 
+materiasList = data.columns[1:].tolist()
+data[materiasList] = data[materiasList].astype(pd.Float64Dtype())
 
 ShowTitleBox(
     "CALCULO DE PROMEDIOS",
@@ -446,7 +449,9 @@ data["Promedio"] = data.iloc[:, 1:].mean(axis=1).round(2)
 ShowDfHead(data, "Notas Master Data Science", 10)
 
 UMBRAL_APROBADO = 60.0
-data["Estado"] = data["Promedio"].apply(lambda x: "Aprobado" if x >= UMBRAL_APROBADO else "Reprobado")
+data["Estado"] = data["Promedio"].apply(
+    lambda x: "Aprobado" if x >= UMBRAL_APROBADO else "Reprobado"
+)
 dataAprobados = data[data.Promedio >= UMBRAL_APROBADO]
 dataReprobados = data[data.Promedio < UMBRAL_APROBADO]
 ShowDfHead(dataAprobados, " Master Data Science - Estudiantes Aprobados ✅", 10)
@@ -454,14 +459,16 @@ ShowDfHead(dataReprobados, " Master Data Science - Estudiantes Reprobados ❌", 
 
 
 promediosMateria = data.iloc[:, 1:-2].mean(axis=0).round(2)
-dataPromediosMateria = pandas.DataFrame({
-    "Materia": promediosMateria.index,
-    "Promedio": promediosMateria.values
-})
+dataPromediosMateria = pandas.DataFrame(
+    {"Materia": promediosMateria.index, "Promedio": promediosMateria.values}
+)
 ShowDfHead(dataPromediosMateria, " Master Data Science - Promedios por materia", 10)
 
 mejorEstudiante = data.loc[data["Promedio"].idxmax()]
 peorEstudiante = data.loc[data["Promedio"].idxmin()]
+
+
+data["Promedio"] = data["Promedio"].astype(pd.Float64Dtype())
 
 # ████████████████████████████████████████████████████████████ Dashboard ████████████████████████████████████████████████████████████
 
@@ -498,7 +505,10 @@ figBarras = px.bar(
     color_continuous_scale="Blues",
 )
 figBarras.update_traces(texttemplate="%{text:.2f}", textposition="outside")
-figBarras.update_layout(template="plotly_dark", xaxis_title="Materia", yaxis_title="Promedio")
+figBarras.update_layout(
+    template="plotly_dark", xaxis_title="Materia", yaxis_title="Promedio"
+)
+
 
 def KpiCard(title, value, subtitle):
     return dbc.Card(
@@ -512,8 +522,15 @@ def KpiCard(title, value, subtitle):
         className="h-100 text-center",
     )
 
-kpiMejorEstudiante = KpiCard("🏆 Mejor Estudiante", f"{mejorEstudiante['Promedio']:.2f}", mejorEstudiante["Nombre"])
-kpiPeorEstudiante = KpiCard("📉 Peor Estudiante", f"{peorEstudiante['Promedio']:.2f}", peorEstudiante["Nombre"])
+
+kpiMejorEstudiante = KpiCard(
+    "🏆 Mejor Estudiante",
+    f"{mejorEstudiante['Promedio']:.2f}",
+    mejorEstudiante["Nombre"],
+)
+kpiPeorEstudiante = KpiCard(
+    "📉 Peor Estudiante", f"{peorEstudiante['Promedio']:.2f}", peorEstudiante["Nombre"]
+)
 
 app.layout = dbc.Container(
     [
@@ -523,7 +540,6 @@ app.layout = dbc.Container(
             dark=True,
             className="mb-4",
         ),
-
         dbc.Row(
             [
                 dbc.Col(kpiMejorEstudiante, md=6),
@@ -531,34 +547,156 @@ app.layout = dbc.Container(
             ],
             className="g-4",
         ),
-
         dbc.Row(
             [
                 dbc.Col(
                     dbc.Card(
-                        dbc.CardBody([
-                            html.H5("Distribución de Aprobados vs Reprobados"),
-                            dcc.Graph(figure=figPastel)
-                        ])
+                        dbc.CardBody(
+                            [
+                                html.H5("Distribución de Aprobados vs Reprobados"),
+                                dcc.Graph(figure=figPastel),
+                            ]
+                        )
                     ),
-                    md=6
+                    md=6,
                 ),
                 dbc.Col(
                     dbc.Card(
-                        dbc.CardBody([
-                            html.H5("Promedio de Calificaciones por Materia"),
-                            dcc.Graph(figure=figBarras)
-                        ])
+                        dbc.CardBody(
+                            [
+                                html.H5("Promedio de Calificaciones por Materia"),
+                                dcc.Graph(figure=figBarras),
+                            ]
+                        )
                     ),
-                    md=6
+                    md=6,
                 ),
             ],
             className="g-4",
+        ),
+        html.Hr(),
+        dbc.Card(
+            dbc.CardBody(
+                [
+                    html.H4("📘 Análisis por materia", className="mb-3"),
+                    dcc.Dropdown(
+                        id="materiaDropdown",
+                        options=[{"label": m, "value": m} for m in materiasList],
+                        placeholder="Seleccione una materia...",
+                        style={"width": "50%"},
+                    ),
+                    html.Br(),
+                    dbc.Row(
+                        [
+                            dbc.Col(
+                                dbc.Card(
+                                    dbc.CardBody(
+                                        [
+                                            html.H6(
+                                                "Promedio de la materia",
+                                                className="text-muted",
+                                            ),
+                                            html.H2(id="materiaMean", className="mb-1"),
+                                        ]
+                                    )
+                                ),
+                                md=4,
+                            ),
+                            dbc.Col(
+                                dbc.Card(
+                                    dbc.CardBody(
+                                        [
+                                            html.H6(
+                                                "🏆 Mejor estudiante",
+                                                className="text-muted",
+                                            ),
+                                            html.H2(id="materiaBest", className="mb-1"),
+                                        ]
+                                    )
+                                ),
+                                md=4,
+                            ),
+                            dbc.Col(
+                                dbc.Card(
+                                    dbc.CardBody(
+                                        [
+                                            html.H6(
+                                                "📉 Peor estudiante",
+                                                className="text-muted",
+                                            ),
+                                            html.H2(
+                                                id="materiaWorst", className="mb-1"
+                                            ),
+                                        ]
+                                    )
+                                ),
+                                md=4,
+                            ),
+                        ],
+                        className="g-4",
+                    ),
+                ]
+            )
+        ),
+        html.Br(),
+        dbc.Card(
+            dbc.CardBody(
+                [
+                    html.H4(
+                        "📊 Distribución de Aprobados vs Reprobados — Materia seleccionada",
+                        className="mb-3",
+                    ),
+                    dcc.Graph(id="materiaPastel"),
+                ]
+            )
         ),
     ],
     fluid=True,
 )
 
+
+@app.callback(
+    Output("materiaMean", "children"),
+    Output("materiaBest", "children"),
+    Output("materiaWorst", "children"),
+    Output("materiaPastel", "figure"),
+    Input("materiaDropdown", "value"),
+)
+def UpdateMateria(materia):
+    if materia is None:
+        # Gráfico vacío cuando no hay selección
+        figEmpty = px.pie(
+            names=["Seleccione una materia"],
+            values=[1],
+            title="Seleccione una materia para ver la distribución",
+        )
+        figEmpty.update_layout(template="plotly_dark")
+        return "—", "—", "—", figEmpty
+
+    mean = data[materia].mean().round(2)
+    best = data.loc[data[materia].idxmax()]
+    worst = data.loc[data[materia].idxmin()]
+
+    bestName = f"{best['Nombre']} ({best[materia]:.2f})"
+    worstName = f"{worst['Nombre']} ({worst[materia]:.2f})"
+
+    aprobados = (data[materia] >= UMBRAL_APROBADO).sum()
+    reprobados = (data[materia] < UMBRAL_APROBADO).sum()
+
+    figMateriaPastel = px.pie(
+        names=["Aprobado", "Reprobado"],
+        values=[aprobados, reprobados],
+        title=f"Distribución de Aprobados vs Reprobados en {materia}",
+        color=["Aprobado", "Reprobado"],
+        color_discrete_map={"Aprobado": "#00cc96", "Reprobado": "#ef553b"},
+        hole=0.3,
+    )
+    figMateriaPastel.update_traces(textinfo="label+percent")
+    figMateriaPastel.update_layout(template="plotly_dark")
+
+    return f"{mean:.2f}", bestName, worstName, figMateriaPastel
+
+
 if __name__ == "__main__":
     webbrowser.open(f"http://{HOST}:{PORT}")
-    app.run(debug=True, port=PORT, host=HOST, use_reloader=False )
+    app.run(debug=False, port=PORT, host=HOST, use_reloader=True)
