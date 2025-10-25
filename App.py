@@ -440,6 +440,8 @@ ShowDfShape(data, "Notas Master Data Science")
 materiasList = data.columns[1:].tolist()
 data[materiasList] = data[materiasList].astype(pd.Float64Dtype())
 
+ShowDfInfo(data, "Notas Master Data Science - Columnas convertidas a Float64")
+
 ShowTitleBox(
     "CALCULO DE PROMEDIOS",
     boxLineStyle=TitleBoxLineStyle.BLOCK,
@@ -579,12 +581,13 @@ app.layout = dbc.Container(
             dbc.CardBody(
                 [
                     html.H4("📘 Análisis por materia", className="mb-3"),
-                    dcc.Dropdown(
-                        id="materiaDropdown",
-                        options=[{"label": m, "value": m} for m in materiasList],
-                        placeholder="Seleccione una materia...",
-                        style={"width": "50%"},
-                    ),
+                    dbc.Select(
+    id="materiaDropdown",
+    options=[{"label": m, "value": m} for m in materiasList],
+    value=None,
+    className="bg-light text-dark border-secondary",
+    style={"width": "50%", "fontSize": "1rem", "borderRadius": "8px"},
+),
                     html.Br(),
                     dbc.Row(
                         [
