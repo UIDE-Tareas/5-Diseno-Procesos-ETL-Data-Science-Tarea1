@@ -163,8 +163,8 @@ def ShowEnvironmentInfo():
     print()
 
 
-# InstallDeps(LIBS)
-# ShowEnvironmentInfo()
+InstallDeps(LIBS)
+ShowEnvironmentInfo()
 
 import requests
 
@@ -703,3 +703,8 @@ def UpdateMateria(materia):
 if __name__ == "__main__":
     webbrowser.open(f"http://{HOST}:{PORT}")
     app.run(debug=False, port=PORT, host=HOST, use_reloader=True)
+
+# TODO
+# Agregar la tabla de todos los estudiantes con sus notas, promedios y estado (aprobado/reprobado).
+# Agregar gráfico de barras de todas las materias con total aprobados y reprobados por materia.
+# Generar pdf
